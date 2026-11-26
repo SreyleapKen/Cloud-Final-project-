@@ -1,3 +1,4 @@
+
 const express = require('express');
 const app = express();
 
@@ -11,11 +12,26 @@ require('dotenv').config();
 const JWT_SECRETE = process.env.JWT_SECRETE;
 
 
+// PROXY ERROR HANDLING
+proxy.on('error', (err, req, res) => {
+    console.error('Proxy Error:', err.message);
+
+    if (!res.headersSent) {
+        res.status(502).json({
+            message: 'Service unavailable',
+            error: err.message
+        });
+    }
+});
+
+
 // REGISTER
-app.use('/register', (req, res) => {
+app.post('/register', (req, res) => {
+
+    req.url = '/userregister';
 
     proxy.web(req, res, {
-        target: 'http://localhost:5001'
+        target: 'http://registration-service.student-attendance.svc.cluster.local:5001'
     });
 
 });
@@ -24,8 +40,10 @@ app.use('/register', (req, res) => {
 // LOGIN
 app.use('/auth', (req, res) => {
 
+    req.url = '/login';
+
     proxy.web(req, res, {
-        target: 'http://localhost:5002'
+        target: 'http://login-service.student-attendance.svc.cluster.local:5002'
     });
 
 });
@@ -61,7 +79,7 @@ app.use('/student', (req, res) => {
         }
 
         proxy.web(req, res, {
-            target: 'http://localhost:5003',
+            target: 'http://student-service.student-attendance.svc.cluster.local:5003',
             headers: {
                 'x-user-studentid': user.studentId,
                 'x-user-role': user.role
@@ -75,7 +93,6 @@ app.use('/student', (req, res) => {
 
 // ATTENDANCE SERVICE
 app.use('/attendance', (req, res) => {
-
     const header = req.headers.authorization;
     const token = header && header.split(' ')[1];
 
@@ -86,38 +103,31 @@ app.use('/attendance', (req, res) => {
     }
 
     jwt.verify(token, JWT_SECRETE, (err, user) => {
-
         if (err) {
             return res.status(403).json({
                 message: 'Invalid token'
             });
         }
 
-        if (
-            user.role !== 'student' &&
-            user.role !== 'admin'
-        ) {
+        if (user.role !== 'student' && user.role !== 'admin') {
             return res.status(403).json({
                 message: 'Unauthorized'
             });
         }
 
+        req.url = '/attendance';
+
         proxy.web(req, res, {
-    target: 'http://localhost:5004',
-    headers: {
-        'x-user-studentid': user.studentId,
-        'x-user-role': user.role,
-        'content-type': 'application/json'
-    }
+            target: 'http://attendance-service.student-attendance.svc.cluster.local:5004',
+            headers: {
+                'x-user-studentid': user.studentId,
+                'x-user-role': user.role,
+                'content-type': 'application/json'
+            }
+        });
     });
-
-    });
-
 });
 
-
 app.listen(5000, () => {
-    console.log(
-        'API Gateway Service is running on PORT NO : 5000'
-    );
+    console.log('API Gateway Service is running on PORT NO : 5000');
 });

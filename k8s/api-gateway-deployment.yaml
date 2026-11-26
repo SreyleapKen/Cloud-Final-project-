@@ -1,0 +1,49 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: student-attendance
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: sreyleap/student-api-gateway:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: student-config
+            - secretRef:
+                name: student-secret
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
+
+        - name: login-service
+          image: sreyleap/student-login:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5002
+          envFrom:
+            - configMapRef:
+                name: student-config
+            - secretRef:
+                name: student-secret
+          volumeMounts:
+            - name: shared-storage
+              mountPath: /shared
+
+      volumes:
+        - name: shared-storage
+          emptyDir: {}
+
